@@ -7,11 +7,12 @@ import select
 from threading import Thread
 import threading
 import mysql
+import time
 
 try:
-    from PyQt4 import QtGui, QtCore
+    from PyQt5 import QtGui, QtCore, QtWidgets
 except:
-	print "Sorry, I can't seem to import pyQt4 for some reason."
+	print "Sorry, I can't seem to import PyQt5 for some reason."
 	sys.exit(1)
 	
 try:
@@ -23,7 +24,7 @@ except:
 
 import balanceboard
 
-class Example(QtGui.QMainWindow):
+class Example(QtWidgets.QMainWindow):
     
     def __init__(self):
         super(Example, self).__init__()
@@ -50,16 +51,16 @@ class Example(QtGui.QMainWindow):
 	
     def closeEvent(self, event):
         print("event")
-        reply = QtGui.QMessageBox.question(self, 'Message', "Are you sure to quit?", QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
+        reply = QtWidgets.QMessageBox.question(self, 'Message', "Are you sure to quit?", QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
 
-        if reply == QtGui.QMessageBox.Yes:
+        if reply == QtWidgets.QMessageBox.Yes:
             self.tboard.pararHilo = False
             event.accept()
         else:
             event.ignore()
             
     def center(self):
-        screen = QtGui.QDesktopWidget().screenGeometry()
+        screen = QtWidgets.QDesktopWidget().screenGeometry()
         size =  self.geometry()
         print "Window Width: %d" % size.width()
         print "Window Height: %d" % size.height()
@@ -67,7 +68,7 @@ class Example(QtGui.QMainWindow):
         print "Screen Height: %d" % screen.height()
         self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
 	
-class Board(QtGui.QFrame):
+class Board(QtWidgets.QFrame):
     msg2Statusbar = QtCore.pyqtSignal(str)
     Speed = 300
     NumCalibraciones = 100
@@ -83,7 +84,7 @@ class Board(QtGui.QFrame):
         self.initBoard()
 
     def initBoard(self):
-        global xwiimote
+        #global xwiimote
         global iface
         global p
 	
@@ -98,13 +99,8 @@ class Board(QtGui.QFrame):
         
         self.bateria = balanceboard.stado_inicial(iface, p)
         
-        maximo = 15000
-        minimo = 0
-        while (maximo - minimo) > 20:
-            self.named_calibration, maximo, minimo  = balanceboard.leerSensores(iface, p, Board.NumCalibraciones)
-            print(self.named_calibration)
-	    print("Max " + str(maximo) + " min " + str(minimo))
-	    print("Dif " + str(maximo - minimo))
+        self.lock = threading.Lock()
+        self.calibrarBB(iface, p)
 
         self.named_wii = self.named_calibration
         
@@ -114,12 +110,33 @@ class Board(QtGui.QFrame):
         
         self.weight = 0
         self.weightText = ""
-        self.lock = threading.Lock()
         self.pararHilo = True
         
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.start()
         self.lanzarHilo()
+        
+    def calibrarBB( self, iface, p ):
+	iface.close(0)
+	wiimote = balanceboard.wait_for_balanceboard()
+        iface = xwiimote.iface(wiimote)
+        #print("syspath:" + iface.get_syspath())
+        fd = iface.get_fd()
+        print("fd:", fd)
+        print("opened mask:", iface.opened())
+	iface.open(xwiimote.IFACE_BALANCE_BOARD)
+	self.bateria = balanceboard.stado_inicial(iface, p)
+	maximo = 15000
+        minimo = 0
+        self.lock.acquire()
+        
+        while (maximo - minimo) > 20:
+            self.named_calibration, maximo, minimo  = balanceboard.leerSensores(iface, p, Board.NumCalibraciones)
+            print(self.named_calibration)
+	    print("Max " + str(maximo) + " min " + str(minimo))
+	    print("Dif " + str(maximo - minimo))
+	self.lock.release()
+	#self.named_calibration = self.named_zero
 
     def lanzarHilo( self ):
         self.weightText = ""
@@ -140,8 +157,11 @@ class Board(QtGui.QFrame):
             #Leemos los sensores
             self.lock.acquire()
             self.named_wii, maximo, minimo  = balanceboard.leerSensores(iface, p, Board.NumLecturas)
-            self.lock.release()
-            self.weight = balanceboard.calcweight(self.named_wii, self.named_calibration) / 100.0
+            #self.lock.release()
+            #if (maximo - minimo) < 40:
+	    self.weight = balanceboard.calcweight(self.named_wii, self.named_calibration) / 100.0
+	    self.lock.release()
+	    time.sleep(0.05)
             
         
     def drawPoints(self, qp):
@@ -164,28 +184,31 @@ class Board(QtGui.QFrame):
         size = self.size()
         # Escribir peso
         qp.setPen(QtCore.Qt.magenta)
-        rectPeso = QtCore.QRect(size.height() / 2, 0, 4 * 80, 2 * 80)
-        qp.drawRect(rectPeso)
+        rectPeso = QtCore.QRect(0, size.height() / 2, size.width() / 2, 2 * 80)
+        #qp.drawRect(rectPeso)
         qp.setPen(QtCore.Qt.black)
-        #qp.setPen(QtGui.black())
+        #qp.setPen(QtWidgets.black())
         qp.setFont(QtGui.QFont('Decorative', 70))
-        #qp.drawText(0,0,size.height() ,size.width() / 2, QtCore.Qt.AlignCenter, str(self.weight) + self.weightText)
-        qp.drawText(rectPeso, QtCore.Qt.AlignCenter, str(self.weight) + "\n" + self.weightText)
+        #qp.drawText(0,0,size.height() ,, QtCore.Qt.AlignCenter, str(self.weight) + self.weightText)
+        qp.drawText(rectPeso, QtCore.Qt.AlignLeft, str(self.weight) + "\n" + self.weightText)
         
         # Escribir bateria
         qp.setPen(QtCore.Qt.blue)
         rectInfo = QtCore.QRect(0, 0,  3 * 30, 30)
-        qp.drawRect(rectInfo)
+        #qp.drawRect(rectInfo)
         qp.setPen(QtCore.Qt.green)
         qp.setFont(QtGui.QFont('Decorative', 30))
         #qp.drawText(0,0,size.height() / 2,size.width() / 2, QtCore.Qt.AlignCenter, str(self.bateria))
         qp.drawText(rectInfo, QtCore.Qt.AlignCenter, str(self.bateria) + "%")
         
     def calcXY(self):
+	#self.lock.acquire()
         readings = self.named_wii
-        self.msg2Statusbar.emit(str(self.weight))
+        peso = self.weight
+        self.msg2Statusbar.emit(str(peso))
+        
         #usar_cal = False
-        if self.weight > 0.5:
+        if peso > 0.5:
 	    right_sens = (float(balanceboard.gsc(readings,'right_top', self.named_calibration)+balanceboard.gsc(readings, 'right_bottom', self.named_calibration)))
 	    left_sens = (float(balanceboard.gsc(readings,'left_top', self.named_calibration)+balanceboard.gsc(readings,'left_bottom', self.named_calibration)))
 	    top_sens = (float(balanceboard.gsc(readings,'left_top', self.named_calibration)+balanceboard.gsc(readings,'right_top', self.named_calibration)))
@@ -196,6 +219,8 @@ class Board(QtGui.QFrame):
 	    top_sens = (float(balanceboard.gsc(readings,'left_top')+balanceboard.gsc(readings,'right_top')))
 	    bottom_sens = (float(balanceboard.gsc(readings,'left_bottom')+balanceboard.gsc(readings,'right_bottom')))
 	    right_sens, left_sens, top_sens, bottom_sens = 0, 0, 0, 0
+        
+        #self.lock.release
         
         if right_sens <= 0:
             if left_sens <= 0:
@@ -241,9 +266,9 @@ class Board(QtGui.QFrame):
         qp.end()
 
     def closeEvent(self, event):
-        reply = QtGui.QMessageBox.question(self, 'Message',
-        "Quieres salir?", QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
-        if reply == QtGui.QMessageBox.Yes:
+        reply = QtWidgets.QMessageBox.question(self, 'Message',
+        "Quieres salir?", QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
+        if reply == QtWidgets.QMessageBox.Yes:
             self.pararHilo = False
             event.accept()
         else:
@@ -269,24 +294,16 @@ class Board(QtGui.QFrame):
                 print(self.named_wii)
 		print("Max " + str(maximo) + " min " + str(minimo))
 		print("Dif " + str(maximo - minimo))
-            self.lock.release()
             self.weight = balanceboard.calcweight(self.named_wii, self.named_calibration) / 100.0
-            self.weightText = " kg +/- " + str((maximo - minimo) / 200)
+            self.lock.release()
+            self.weightText = " kg +/- " + str((maximo - minimo) / 200.0)
             self.update()
             mysql.guardar_peso(self.weight)
 
         elif key == QtCore.Qt.Key_C:
             self.timer.stop()
-            self.lock.acquire()
             print "CALIBRANDO"
-            maximo = 10000
-            minimo = 0
-            while (maximo - minimo) > 20:
-                self.named_calibration, maximo, minimo  = balanceboard.leerSensores(iface, p, Board.NumCalibraciones)
-                print(self.named_calibration)
-		print("Max " + str(maximo) + " min " + str(minimo))
-		print("Dif " + str(maximo - minimo))
-            self.lock.release()
+            self.calibrarBB(iface, p)
             self.named_wii = self.named_calibration
             self.timer.start(Board.Speed, self)
             self.update()
@@ -311,7 +328,7 @@ class Board(QtGui.QFrame):
             super(Board, self).timerEvent(event)
 
 def main():
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     ex = Example()
     sys.exit(app.exec_())
     self.pararHilo = False

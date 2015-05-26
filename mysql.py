@@ -11,5 +11,5 @@ def guardar_peso(peso):
 
         cur = con.cursor()
         #weight table
-        cur.execute("CREATE TABLE IF NOT EXISTS weight(CURRENT_DATE DATETIME PRIMARY KEY NOT NULL  DEFAULT (CURRENT_DATE), weight REAL)")
+        #cur.execute("CREATE TABLE IF NOT EXISTS weight(CURRENT_DATE DATETIME PRIMARY KEY NOT NULL  DEFAULT (CURRENT_DATE), weight REAL)")
         cur.execute("INSERT OR REPLACE INTO weight (CURRENT_DATE, weight) VALUES (DATE('now'), "+str(peso)+")")

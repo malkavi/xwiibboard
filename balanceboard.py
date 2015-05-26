@@ -3,6 +3,7 @@
 
 import time
 import numpy
+import errno
 
 try:
     import xwiimote
@@ -20,11 +21,11 @@ named_zero = { 'right_top': 0,
 def stado_inicial(mdevice, p1):
     # display some information and open the iface
     try:
-        print("syspath:" + mdevice.get_syspath())
-        fd = mdevice.get_fd()
-        print("fd:", fd)
-        print("opened mask:", mdevice.opened())
-        mdevice.open(mdevice.available() | xwiimote.IFACE_WRITABLE)
+        #print("syspath:" + mdevice.get_syspath())
+        #fd = mdevice.get_fd()
+        #print("fd:", fd)
+        #print("opened mask:", mdevice.opened())
+        #mdevice.open(mdevice.available() | xwiimote.IFACE_WRITABLE)
         print("opened mask:", mdevice.opened())
         bateria = mdevice.get_battery()
         print("capacity:", bateria, "%")
@@ -34,13 +35,17 @@ def stado_inicial(mdevice, p1):
         print("ooops", e)
         exit(1)
     
-    mdevice.set_mp_normalization(10, 20, 30, 40)
+    #mdevice.set_mp_normalization(10, 20, 30, 40)
     #mdevice.set_mp_normalization(0, 0, 0, 0)
-    x, y, z, factor = mdevice.get_mp_normalization()
-    print("mp", x, y, z, factor)
+    #x, y, z, factor = mdevice.get_mp_normalization()
+    #print("mp", x, y, z, factor)
     #calibrate(mdevice, p1)
     #mdevice.close(0)
     return bateria
+  
+def recalibrar(mdevice):
+    mdevice.close(0)
+    mdevice.open(mdevice.available() | xwiimote.IFACE_WRITABLE)
 	
 def sumarSensores( readings ):
     """
