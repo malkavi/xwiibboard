@@ -8,6 +8,9 @@ from threading import Thread
 import threading
 import mysql
 import time
+import users
+
+from functools import partial
 
 try:
     from PyQt5 import QtGui, QtCore, QtWidgets
@@ -26,14 +29,13 @@ import balanceboard
 
 class Example(QtWidgets.QMainWindow):
     
-    def __init__(self):
+    def __init__(self, user):
         super(Example, self).__init__()
-        
+        self.user = user
         self.initUI()
         
     def initUI(self):      
-        
-        self.tboard = Board(self)
+        self.tboard = Board(self, self.user)
         self.setCentralWidget(self.tboard)
         
         self.statusbar = self.statusBar()        
@@ -67,8 +69,51 @@ class Example(QtWidgets.QMainWindow):
         print "Screen Width: %d" % screen.width()
         print "Screen Height: %d" % screen.height()
         self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
+        
+class User(QtWidgets.QMainWindow):
+    
+    def __init__(self):
+        super(User, self).__init__()
+        
+        self.initUI()
+        
+    def initUI(self):      
+        self.lbl = QtWidgets.QLabel("User", self)
+        list_user = users.list_users()
+        
+        # List of users (db)
+        self.combo = QtWidgets.QComboBox(self)
+        self.combo.addItems(list_user)
+        self.combo.move(50, 50)
+        self.lbl.move(50, 150)
+
+        # Launch BBoard
+        self.btn1 = QtWidgets.QPushButton("Click me", self)
+        self.btn1.setGeometry(QtCore.QRect(0, 0, 100, 30))
+        
+        
+        self.btn1.clicked.connect(lambda: self.onClick(self.combo.currentText()))
+        self.combo.activated[str].connect(self.onActivated)
+         
+        self.setGeometry(300, 300, 300, 200)
+        self.setWindowTitle('Select user')
+        self.show()
+        
+    def onClick(self, text):
+        print text
+        self.lbl.setText(text)
+        self.lbl.adjustSize()
+        self.initBBoard(text)
+        
+    def onActivated(self, text):
+        print text
+        
+    def initBBoard(self, user):
+        w = Example(user)
+        w.show()
 	
 class Board(QtWidgets.QFrame):
+    user = 'ivan'
     msg2Statusbar = QtCore.pyqtSignal(str)
     Speed = 300
     NumCalibraciones = 100
@@ -79,7 +124,9 @@ class Board(QtWidgets.QFrame):
 		    'left_bottom': 0,
     }
 	
-    def __init__(self, parent):
+    def __init__(self, parent, user):
+        self.user = user
+        print self.user
         super(Board, self).__init__(parent)
         self.initBoard()
 
@@ -298,7 +345,7 @@ class Board(QtWidgets.QFrame):
             self.lock.release()
             self.weightText = " kg +/- " + str((maximo - minimo) / 200.0)
             self.update()
-            mysql.guardar_peso(self.weight)
+            mysql.guardar_peso(self.user, self.weight)
 
         elif key == QtCore.Qt.Key_C:
             self.timer.stop()
@@ -329,7 +376,7 @@ class Board(QtWidgets.QFrame):
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
-    ex = Example()
+    ex = User()
     sys.exit(app.exec_())
     self.pararHilo = False
 
