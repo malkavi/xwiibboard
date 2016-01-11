@@ -72,6 +72,8 @@ class Example(QtWidgets.QMainWindow):
         
 class User(QtWidgets.QMainWindow):
     
+    user = 'ivan'
+    
     def __init__(self):
         super(User, self).__init__()
         
@@ -103,7 +105,9 @@ class User(QtWidgets.QMainWindow):
         print text
         self.lbl.setText(text)
         self.lbl.adjustSize()
-        self.initBBoard(text)
+        self.user = text
+        self.close()
+        #self.initBBoard(text)
         
     def onActivated(self, text):
         print text
@@ -111,6 +115,9 @@ class User(QtWidgets.QMainWindow):
     def initBBoard(self, user):
         w = Example(user)
         w.show()
+        
+    def get_user(self):
+        return self.user
 	
 class Board(QtWidgets.QFrame):
     user = 'ivan'
@@ -377,6 +384,9 @@ class Board(QtWidgets.QFrame):
 def main():
     app = QtWidgets.QApplication(sys.argv)
     ex = User()
+    user = ex.get_user()
+    app.exec_()
+    w = Example(user)
     sys.exit(app.exec_())
     self.pararHilo = False
 
